@@ -126,8 +126,8 @@ body.modal-open{overflow:hidden}
 </form></section>
 <section class="finder-card"><div class="section-title">Buscar vehículo</div><form class="finder-form" id="finderForm">
 <label><span>Marca</span><select id="brand" disabled><option value="">Marca</option></select></label>
-<label><span>Modelo</span><select id="model" disabled><option value="">Modelo</option></select></label>
 <label><span>Cilindrada</span><select id="capacity" disabled><option value="">Cilindrada</option></select></label>
+<label><span>Modelo</span><select id="model" disabled><option value="">Modelo</option></select></label>
 <label><span>Año</span><select id="year" disabled><option value="">Año</option></select></label>
 <div class="form-actions"><button class="search-button" id="searchButton" type="submit" disabled>Buscar</button><button class="reset-button" id="resetButton" type="button" disabled>Limpiar</button></div>
 </form></section>
@@ -336,20 +336,24 @@ const brand=document.querySelector("#brand"),model=document.querySelector("#mode
 const form=document.querySelector("#finderForm"),searchButton=document.querySelector("#searchButton"),resetButton=document.querySelector("#resetButton"),results=document.querySelector("#results");
 const quickForm=document.querySelector("#quickForm"),quickInput=document.querySelector("#quickInput");
 function setOptions(select,placeholder,values,format=value=>value){select.innerHTML=`<option value="">${placeholder}</option>`+values.map(value=>`<option value="${safe(value)}">${safe(format(value))}</option>`).join("");select.disabled=!values.length}
-function updateButtons(){searchButton.disabled=!(brand.value&&model.value&&capacity.value&&year.value);resetButton.disabled=!brand.value}
+function updateButtons(){searchButton.disabled=!(brand.value&&capacity.value&&model.value&&year.value);resetButton.disabled=!brand.value}
 function empty(){results.innerHTML=""}
 function resetDownstream(from){
-if(from==="brand"){setOptions(model,"Modelo",[]);setOptions(capacity,"Cilindrada",[]);setOptions(year,"Año",[])}
-if(from==="model"){setOptions(capacity,"Cilindrada",[]);setOptions(year,"Año",[])}
-if(from==="capacity")setOptions(year,"Año",[]);
+if(from==="brand"){setOptions(capacity,"Cilindrada",[]);setOptions(model,"Modelo",[]);setOptions(year,"Año",[])}
+if(from==="capacity"){setOptions(model,"Modelo",[]);setOptions(year,"Año",[])}
+if(from==="model")setOptions(year,"Año",[]);
 empty();updateButtons();
 }
-brand.onchange=()=>{resetDownstream("brand");if(brand.value)setOptions(model,"Selecciona",uniqueSorted(applications.filter(item=>item.marca===brand.value).map(item=>item.modelo)));updateButtons()}
-model.onchange=()=>{resetDownstream("model");if(model.value)setOptions(capacity,"Selecciona",uniqueSorted(applications.filter(item=>item.marca===brand.value&&item.modelo===model.value).map(item=>item.cilindrada)).sort((a,b)=>capacityNumber(a)-capacityNumber(b)),capacityLabel);updateButtons()}
+brand.onchange=()=>{resetDownstream("brand");if(brand.value)setOptions(capacity,"Selecciona",uniqueSorted(applications.filter(item=>item.marca===brand.value).map(item=>item.cilindrada)).sort((a,b)=>capacityNumber(a)-capacityNumber(b)),capacityLabel);updateButtons()}
 capacity.onchange=()=>{
 resetDownstream("capacity");
-if(capacity.value){
-const matching=applications.filter(item=>item.marca===brand.value&&item.modelo===model.value&&item.cilindrada===capacity.value);
+if(capacity.value)setOptions(model,"Selecciona",uniqueSorted(applications.filter(item=>item.marca===brand.value&&item.cilindrada===capacity.value).map(item=>item.modelo)));
+updateButtons();
+}
+model.onchange=()=>{
+resetDownstream("model");
+if(model.value){
+const matching=applications.filter(item=>item.marca===brand.value&&item.cilindrada===capacity.value&&item.modelo===model.value);
 const knownYears=[...new Set(matching.flatMap(item=>yearRange(item.año)))].sort((a,b)=>a-b);
 const values=matching.some(item=>!item.año)?[...knownYears,UNKNOWN_YEAR]:knownYears;
 setOptions(year,"Selecciona",values,value=>value===UNKNOWN_YEAR?"No indicado":value);
@@ -362,11 +366,11 @@ function refs(title,items){return `<section class="reference-block${items.length
 function renderMatches(matches,title,details=[]){
 if(!matches.length){results.innerHTML='<div class="empty-state">No se encontraron resultados.</div>';return}
 const maximum=200,ordered=[...matches].sort(compareApplications),visible=ordered.slice(0,maximum),countText=matches.length>maximum?`${visible.length} de ${matches.length} resultados`:`${matches.length} ${matches.length===1?"resultado":"resultados"}`;
-results.innerHTML=`<div class="results-heading"><div><span>RESULTADO</span><h2>${safe(title)}</h2></div><div class="selection-summary">${details.map(detail=>`<strong>${safe(detail)}</strong>`).join("")}<small>${countText}</small></div></div><div class="results-grid">${visible.map(item=>`<article class="result-card"><header><div><h3>${safe(item.marca)} ${safe(item.modelo)}</h3></div><div class="fitment"><strong>${safe(capacityLabel(item.cilindrada))}</strong><span>${safe(item.año||"Año no indicado")}</span></div></header><div class="reference-grid">${refs("Filtro de aceite",item.filtros_aceite||[])}${refs("Filtro de aire",item.filtros_aire||[])}</div></article>`).join("")}</div>`;
+results.innerHTML=`<div class="results-heading"><div><span>RESULTADO</span><h2>${safe(title)}</h2></div><div class="selection-summary"><small>${countText}</small></div></div><div class="results-grid">${visible.map(item=>`<article class="result-card"><header><div><h3>${safe(item.marca)} ${safe(item.modelo)}</h3></div><div class="fitment"><strong>${safe(capacityLabel(item.cilindrada))}</strong><span>${safe(item.año||"Año no indicado")}</span></div></header><div class="reference-grid">${refs("Filtro de aceite",item.filtros_aceite||[])}${refs("Filtro de aire",item.filtros_aire||[])}</div></article>`).join("")}</div>`;
 }
 form.onsubmit=event=>{
 event.preventDefault();if(searchButton.disabled)return;
-const matches=applications.filter(item=>item.marca===brand.value&&item.modelo===model.value&&item.cilindrada===capacity.value&&(year.value===UNKNOWN_YEAR?!item.año:yearRange(item.año).includes(+year.value)));
+const matches=applications.filter(item=>item.marca===brand.value&&item.cilindrada===capacity.value&&item.modelo===model.value&&(year.value===UNKNOWN_YEAR?!item.año:yearRange(item.año).includes(+year.value)));
 renderMatches(matches,`${brand.value} ${model.value}`,[capacityLabel(capacity.value),year.value===UNKNOWN_YEAR?"Año no indicado":year.value]);
 }
 quickForm.onsubmit=event=>{
